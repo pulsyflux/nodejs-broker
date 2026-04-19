@@ -78,6 +78,11 @@ function readGoModuleVersion() {
     console.error('[postinstall] FAILED: "goModuleVersion" field missing from package.json');
     process.exit(1);
   }
+  // Validate version format to prevent command injection (e.g. "v1.2.3" or "v1.2.3-rc1")
+  if (!/^v\d+\.\d+\.\d+(-[\w.]+)?$/.test(version)) {
+    console.error(`[postinstall] FAILED: invalid goModuleVersion format: ${version}`);
+    process.exit(1);
+  }
   return version;
 }
 

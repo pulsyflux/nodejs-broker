@@ -3,6 +3,7 @@ package main
 // #include <stdlib.h>
 import "C"
 import (
+	"sync"
 	"unsafe"
 
 	"github.com/google/uuid"
@@ -10,6 +11,7 @@ import (
 )
 
 var (
+	mu      sync.Mutex
 	servers = make(map[int]*broker.Server)
 	clients = make(map[int]*broker.Client)
 	subs    = make(map[int]<-chan []byte)
@@ -18,6 +20,8 @@ var (
 
 //export ServerNew
 func ServerNew(address *C.char) C.int {
+	mu.Lock()
+	defer mu.Unlock()
 	s := broker.NewServer(C.GoString(address))
 	id := nextID
 	nextID++
@@ -27,7 +31,9 @@ func ServerNew(address *C.char) C.int {
 
 //export ServerStart
 func ServerStart(id C.int) C.int {
+	mu.Lock()
 	s := servers[int(id)]
+	mu.Unlock()
 	if s == nil {
 		return -1
 	}
@@ -39,7 +45,9 @@ func ServerStart(id C.int) C.int {
 
 //export ServerAddr
 func ServerAddr(id C.int) *C.char {
+	mu.Lock()
 	s := servers[int(id)]
+	mu.Unlock()
 	if s == nil {
 		return nil
 	}
@@ -48,14 +56,17 @@ func ServerAddr(id C.int) *C.char {
 
 //export ServerStop
 func ServerStop(id C.int) C.int {
+	mu.Lock()
 	s := servers[int(id)]
 	if s == nil {
-		return -1
-	}
-	if err := s.Stop(); err != nil {
+		mu.Unlock()
 		return -1
 	}
 	delete(servers, int(id))
+	mu.Unlock()
+	if err := s.Stop(); err != nil {
+		return -1
+	}
 	return 0
 }
 
@@ -69,6 +80,8 @@ func NewClient(address *C.char, channelID *C.char) C.int {
 	if err != nil {
 		return -1
 	}
+	mu.Lock()
+	defer mu.Unlock()
 	id := nextID
 	nextID++
 	clients[id] = client
@@ -77,7 +90,9 @@ func NewClient(address *C.char, channelID *C.char) C.int {
 
 //export Publish
 func Publish(id C.int, payload *C.char, payloadLen C.int) C.int {
+	mu.Lock()
 	client := clients[int(id)]
+	mu.Unlock()
 	if client == nil {
 		return -1
 	}
@@ -90,18 +105,21 @@ func Publish(id C.int, payload *C.char, payloadLen C.int) C.int {
 
 //export Subscribe
 func Subscribe(id C.int, payload **C.char, payloadLen *C.int) C.int {
+	mu.Lock()
 	client := clients[int(id)]
+	ch, exists := subs[int(id)]
+	mu.Unlock()
 	if client == nil {
 		return -1
 	}
-	
-	// Get or create subscription channel
-	ch, exists := subs[int(id)]
+
 	if !exists {
 		ch = client.Subscribe()
+		mu.Lock()
 		subs[int(id)] = ch
+		mu.Unlock()
 	}
-	
+
 	// Receive from channel
 	select {
 	case msg, ok := <-ch:
@@ -123,7 +141,8 @@ func FreePayload(ptr unsafe.Pointer) {
 
 //export Cleanup
 func Cleanup() {
-	// Clean up all resources
+	mu.Lock()
+	defer mu.Unlock()
 	for id := range servers {
 		if s := servers[id]; s != nil {
 			s.Stop()

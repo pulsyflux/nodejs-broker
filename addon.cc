@@ -40,8 +40,13 @@ public:
     // Poll for messages with small delays
     for (int i = 0; i < 100; i++) {
       int result = Subscribe(clientId_, &payload_, &payloadLen_);
-      if (result == 0 && payload_) {
+      if (result == 0 && payload_ && payloadLen_ > 0 && payloadLen_ <= 64 * 1024 * 1024) {
         return; // Got a message
+      }
+      if (payload_) {
+        FreePayload(payload_);
+        payload_ = nullptr;
+        payloadLen_ = 0;
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -89,7 +94,16 @@ public:
   }
   
   Server(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Server>(info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 1 || !info[0].IsString()) {
+      Napi::TypeError::New(env, "Expected string address").ThrowAsJavaScriptException();
+      return;
+    }
     std::string address = info[0].As<Napi::String>().Utf8Value();
+    if (address.empty() || address.length() > 256) {
+      Napi::RangeError::New(env, "Address must be 1-256 characters").ThrowAsJavaScriptException();
+      return;
+    }
     id_ = NewServer(address.c_str());
   }
   
@@ -129,9 +143,26 @@ public:
   }
   
   Client(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Client>(info) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsString() || !info[1].IsString()) {
+      Napi::TypeError::New(env, "Expected (address: string, channelID: string)").ThrowAsJavaScriptException();
+      return;
+    }
     std::string address = info[0].As<Napi::String>().Utf8Value();
     std::string channelID = info[1].As<Napi::String>().Utf8Value();
+    if (address.empty() || address.length() > 256) {
+      Napi::RangeError::New(env, "Address must be 1-256 characters").ThrowAsJavaScriptException();
+      return;
+    }
+    if (channelID.length() != 36) {
+      Napi::TypeError::New(env, "channelID must be a valid UUID (36 characters)").ThrowAsJavaScriptException();
+      return;
+    }
     id_ = NewClient(address.c_str(), channelID.c_str());
+    if (id_ < 0) {
+      Napi::Error::New(env, "Failed to create client").ThrowAsJavaScriptException();
+      return;
+    }
   }
   
   Napi::Value PublishMethod(const Napi::CallbackInfo& info) {
@@ -163,7 +194,12 @@ public:
     
     int result = Subscribe(id_, &payload, &payloadLen);
     
-    if (result < 0) {
+    if (result < 0 || !payload) {
+      return info.Env().Null();
+    }
+
+    if (payloadLen <= 0 || payloadLen > 64 * 1024 * 1024) {
+      FreePayload(payload);
       return info.Env().Null();
     }
     
@@ -230,6 +266,14 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
   Subscribe = (SubscribeFunc)GetProcAddress(hLib, "Subscribe");
   FreePayload = (FreePayloadFunc)GetProcAddress(hLib, "FreePayload");
   Cleanup = (CleanupFunc)GetProcAddress(hLib, "Cleanup");
+
+  if (!NewServer || !Start || !Addr || !Stop || !NewClient ||
+      !Publish || !Subscribe || !FreePayload || !Cleanup) {
+    Napi::Error::New(env, "Failed to resolve one or more broker_lib.dll exports").ThrowAsJavaScriptException();
+    FreeLibrary(hLib);
+    hLib = nullptr;
+    return exports;
+  }
   
   env.AddCleanupHook([]() {
     if (Cleanup) Cleanup();
