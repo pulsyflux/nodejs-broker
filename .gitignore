@@ -1,53 +1,37 @@
-# Binaries
-*.exe
+# Build output
+.bin/
+
+# Build artifacts (generated during install)
+*.node
 *.dll
-*.so
-*.dylib
+*.lib
+*.def
+*.pdb
+*.h
 
-# Test binaries
-*.test
+# Go build files (go.sum is generated, go.mod is tracked)
+go.sum
 
-# Go build cache
-socket-exp/build/
-socket-exp/.cache/
-messagebus-nodejs/build/
-messagebus-nodejs/.cache/
-
-# C headers (generated)
-socket-exp/socket_lib.h
-messagebus-nodejs/messagebus_lib.h
-nodejs-api/broker_lib.h
-nodejs-api/messagebus_lib.h
-
-# Node modules
+# Node.js
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Go workspace
-go.work
-go.work.sum
+# Test artifacts
+.nyc_output
+coverage/
 
 # IDE
+.vscode/
 .idea/
 *.swp
 *.swo
-*~
-
-# Act secrets (local CI testing)
-.secrets
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-
-# Profiles
-*.prof
-*.pprof
-cpu.prof
-mem.prof
-
-# Test artifacts
-perf_*.txt
-benchmark_*.txt
+# Temporary files
+*.tmp
+*.temp

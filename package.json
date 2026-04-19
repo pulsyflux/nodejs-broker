@@ -1,5 +1,5 @@
 {
-  "name": "@pulsyflux/broker",
+  "name": "@pulsyflux/nodejs-broker",
   "version": "1.0.0",
   "description": "Node.js bindings for PulsyFlux - high-performance pub/sub message broker with native C++ addon and Go shared library",
   "main": ".bin/release/registry.mjs",
@@ -62,17 +62,15 @@
     "name": "PulsyFlux Team"
   },
   "license": "MIT",
-  "goModuleVersion": "v1.0.0",
   "publishConfig": {
     "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/pulsyflux/broker.git",
-    "directory": "nodejs-api"
+    "url": "https://github.com/pulsyflux/nodejs-broker.git"
   },
-  "homepage": "https://github.com/pulsyflux/broker#readme",
+  "homepage": "https://github.com/pulsyflux/nodejs-broker#readme",
   "bugs": {
-    "url": "https://github.com/pulsyflux/broker/issues"
+    "url": "https://github.com/pulsyflux/nodejs-broker/issues"
   }
 }

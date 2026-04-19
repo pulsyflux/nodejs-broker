@@ -1,5 +1,5 @@
 /**
- * postinstall.mjs — Consumer-side build pipeline for @pulsyflux/broker.
+ * postinstall.mjs — Consumer-side build pipeline for @pulsyflux/nodejs-broker.
  *
  * Runs during `pnpm install` to fetch the Go module, compile the Go shared
  * library and C++ addon locally on the consumer's machine.
@@ -109,9 +109,9 @@ function main() {
   }
 
   // 2. Fetch Go module (only when running as an installed npm package, not in the source repo)
-  //    Detect source repo by checking if go.mod exists in the parent directory
-  const repoGoMod = join(__dirname, '..', 'go.mod');
-  const isSourceRepo = existsSync(repoGoMod);
+  //    Detect source repo by checking if go.mod exists in this directory (dev checkout)
+  const localGoMod = join(__dirname, 'go.mod');
+  const isSourceRepo = existsSync(localGoMod);
 
   if (isSourceRepo) {
     console.log('[postinstall] Running inside source repo — skipping go get (using local Go source)');
@@ -124,20 +124,10 @@ function main() {
   }
 
   // 3. Build Go shared library
-  //    When in source repo, build from parent directory where go.mod lives
-  if (isSourceRepo) {
-    const repoRoot = join(__dirname, '..');
-    run(
-      'go build -buildmode=c-shared -o nodejs-api/.bin/release/broker_lib.dll nodejs-api/broker_lib.go',
-      'Building Go shared library (from source repo)',
-      repoRoot
-    );
-  } else {
-    run(
-      'go build -buildmode=c-shared -o .bin/release/broker_lib.dll',
-      'Building Go shared library'
-    );
-  }
+  run(
+    'go build -buildmode=c-shared -o .bin/release/broker_lib.dll broker_lib.go',
+    'Building Go shared library'
+  );
 
   // 4. Build C++ addon
   run('node build.mjs', 'Building C++ addon');
